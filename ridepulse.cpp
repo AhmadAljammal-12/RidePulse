@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <cctype>
+#include <stdexcept>
 
 using namespace std;
 
@@ -25,14 +26,39 @@ bool isBackCommand(const string &input)
     return lowered == "back" || lowered == "b";
 }
 
+[[noreturn]] void throwInputTerminated(const string &context)
+{
+    throw runtime_error("Input stream closed while " + context + ".");
+}
+
+bool equalsIgnoreCase(const string &lhs, const string &rhs)
+{
+    if (lhs.size() != rhs.size())
+        return false;
+    for (size_t i = 0; i < lhs.size(); ++i)
+    {
+        if (tolower(static_cast<unsigned char>(lhs[i])) != tolower(static_cast<unsigned char>(rhs[i])))
+            return false;
+    }
+    return true;
+}
+
 double getPositiveDouble(const string &prompt)
 {
     while (true)
     {
         cout << prompt;
         double v;
-        if (cin >> v && v > 0)
-            return v;
+        if (cin >> v)
+        {
+            if (v > 0)
+                return v;
+        }
+        else
+        {
+            if (cin.eof())
+                throwInputTerminated("entering the trip distance");
+        }
         cout << "❌ Invalid input. Please enter a positive number.\n";
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
@@ -50,7 +76,18 @@ int getRideChoice(bool allowBack, bool &goBack)
              << "3. Ride Share(RM 1.00/km, min RM 3)\n";
         cout << (allowBack ? "Enter choice (1-3 or 'back'): " : "Enter choice (1-3): ");
         string input;
-        cin >> input;
+        if (!(cin >> input))
+        {
+            if (cin.eof())
+                throwInputTerminated("selecting a ride type");
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "❌ Invalid choice. Please enter 1, 2, or 3";
+            if (allowBack)
+                cout << " (or type 'back' to return)";
+            cout << ".\n";
+            continue;
+        }
         if (allowBack && isBackCommand(input))
         {
             goBack = true;
@@ -77,7 +114,18 @@ bool getYesNo(const string &prompt, bool allowBack, bool &goBack)
         goBack = false;
         cout << prompt;
         string s;
-        cin >> s;
+        if (!(cin >> s))
+        {
+            if (cin.eof())
+                throwInputTerminated("answering a yes/no question");
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "❌ Please enter y/n";
+            if (allowBack)
+                cout << " or 'back'";
+            cout << ".\n";
+            continue;
+        }
         if (allowBack && isBackCommand(s))
         {
             goBack = true;
@@ -101,134 +149,157 @@ double round2(double v)
 
 int main()
 {
-    cout << "===============================\n";
-    cout << "   Welcome to RidePulse App!   \n";
-    cout << "===============================\n\n";
-    cout << fixed << setprecision(2);
-
-    const double RATE_ECON = 1.50;
-    const double RATE_PREM = 2.50;
-    const double RATE_SHARE = 1.00;
-    const double MIN_ECON = 4.00;
-    const double MIN_PREM = 7.00;
-    const double MIN_SHARE = 3.00;
-    const double BOOKING_FEE = 1.20; // flat booking/admin fee
-    const double SERVICE_FEE = 0.05; // 5%
-    const double SURGE_PEAK = 1.20;  // 20% increase at peak
-    const string PROMO = "PULSE10";
-    const double PROMO_DISC = 0.10; // 10%
-
-    bool keepRunning = true;
-    while (keepRunning)
+    try
     {
-        double distance = 0.0;
-        RideType type = ECONOMY;
-        bool peak = false;
-        string promo = "-";
-        int step = 0;
+        cout << "===============================\n";
+        cout << "   Welcome to RidePulse App!   \n";
+        cout << "===============================\n\n";
+        cout << fixed << setprecision(2);
 
-        while (step < 4)
+        const double RATE_ECON = 1.50;
+        const double RATE_PREM = 2.50;
+        const double RATE_SHARE = 1.00;
+        const double MIN_ECON = 4.00;
+        const double MIN_PREM = 7.00;
+        const double MIN_SHARE = 3.00;
+        const double BOOKING_FEE = 1.20; // flat booking/admin fee
+        const double SERVICE_FEE = 0.05; // 5%
+        const double SURGE_PEAK = 1.20;  // 20% increase at peak
+        const string PROMO = "PULSE10";
+        const double PROMO_DISC = 0.10; // 10%
+
+        bool keepRunning = true;
+        while (keepRunning)
         {
-            if (step == 0)
+            double distance = 0.0;
+            RideType type = ECONOMY;
+            bool peak = false;
+            string promoInput = "-";
+            int step = 0;
+
+            while (step < 4)
             {
-                distance = getPositiveDouble("Enter your trip distance (km): ");
-                step = 1;
-            }
-            else if (step == 1)
-            {
-                bool goBack = false;
-                int choice = getRideChoice(true, goBack);
-                if (goBack)
+                if (step == 0)
                 {
-                    cout << "↩️  Returning to distance entry.\n\n";
-                    step = 0;
-                    continue;
-                }
-                type = static_cast<RideType>(choice);
-                step = 2;
-            }
-            else if (step == 2)
-            {
-                bool goBack = false;
-                peak = getYesNo("Is it peak hours? (y/n or 'back' to change ride type): ", true, goBack);
-                if (goBack)
-                {
-                    cout << "↩️  Returning to ride type selection.\n\n";
+                    distance = getPositiveDouble("Enter your trip distance (km): ");
                     step = 1;
-                    continue;
                 }
-                step = 3;
-            }
-            else if (step == 3)
-            {
-                cout << "Enter promo code (or - to skip, 'back' to review peak choice): ";
-                cin >> promo;
-                if (isBackCommand(promo))
+                else if (step == 1)
                 {
-                    cout << "↩️  Returning to peak hours question.\n\n";
+                    bool goBack = false;
+                    int choice = getRideChoice(true, goBack);
+                    if (goBack)
+                    {
+                        cout << "↩️  Returning to distance entry.\n\n";
+                        step = 0;
+                        continue;
+                    }
+                    type = static_cast<RideType>(choice);
                     step = 2;
-                    continue;
                 }
-                step = 4;
+                else if (step == 2)
+                {
+                    bool goBack = false;
+                    peak = getYesNo("Is it peak hours? (y/n or 'back' to change ride type): ", true, goBack);
+                    if (goBack)
+                    {
+                        cout << "↩️  Returning to ride type selection.\n\n";
+                        step = 1;
+                        continue;
+                    }
+                    step = 3;
+                }
+                else if (step == 3)
+                {
+                    cout << "Enter promo code (or - to skip, 'back' to review peak choice): ";
+                    if (!(cin >> promoInput))
+                    {
+                        if (cin.eof())
+                            throwInputTerminated("entering a promo code");
+                        cin.clear();
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                        cout << "❌ Invalid input. Please try again.\n";
+                        continue;
+                    }
+                    if (isBackCommand(promoInput))
+                    {
+                        cout << "↩️  Returning to peak hours question.\n\n";
+                        step = 2;
+                        continue;
+                    }
+                    if (promoInput != "-" && !equalsIgnoreCase(promoInput, PROMO))
+                    {
+                        cout << "⚠️ Promo code not recognized. No discount will be applied.\n";
+                    }
+                    step = 4;
+                }
             }
+            // base calculation
+            double perKm = (type == ECONOMY ? RATE_ECON : (type == PREMIUM ? RATE_PREM : RATE_SHARE));
+            double minFare = (type == ECONOMY ? MIN_ECON : (type == PREMIUM ? MIN_PREM : MIN_SHARE));
+            double distanceFare = distance * perKm;
+            double baseFare = distanceFare < minFare ? minFare : distanceFare;
+
+            double surgedFare = peak ? baseFare * SURGE_PEAK : baseFare;
+            double subtotalBeforeService = surgedFare + BOOKING_FEE;
+
+            double serviceFee = subtotalBeforeService * SERVICE_FEE;
+            double subtotal = subtotalBeforeService + serviceFee;
+
+            // promo
+            double discount = 0.0;
+            bool promoApplied = false;
+            bool promoSkipped = (promoInput == "-");
+            if (!promoSkipped)
+            {
+                if (equalsIgnoreCase(promoInput, PROMO))
+                {
+                    discount = subtotal * PROMO_DISC;
+                    subtotal -= discount;
+                    promoApplied = true;
+                }
+            }
+
+            double total = round2(subtotal);
+
+            // output summary
+            cout << "\n========== Ride Summary ==========\n";
+            cout << "Distance:           " << distance << " km\n";
+            if (type == ECONOMY)
+                cout << "Ride Type:          Economy\n";
+            else if (type == PREMIUM)
+                cout << "Ride Type:          Premium\n";
+            else
+                cout << "Ride Type:          Ride Share\n";
+            cout << "Base (after min):   RM " << baseFare << "\n";
+            cout << "Booking Fee:        RM " << BOOKING_FEE << "\n";
+            if (peak)
+                cout << "Peak Surge (x1.20): applied\n";
+            else
+                cout << "Peak Surge:         none\n";
+            cout << "Service Fee (5%):   RM " << serviceFee << "\n";
+            if (promoApplied)
+                cout << "Promo (" << PROMO << "):   -RM " << discount << "\n";
+            else if (!promoSkipped)
+                cout << "Promo:              invalid (" << promoInput << ")\n";
+            else
+                cout << "Promo:              none\n";
+            cout << "----------------------------------\n";
+            cout << "Total Fare:         RM " << total << "\n";
+            cout << "==================================\n";
+
+            bool ignoreBack = false;
+            keepRunning = getYesNo("\nAnother ride? (y/n): ", false, ignoreBack);
+            cout << "\n";
         }
 
-        // base calculation
-        double perKm = (type == ECONOMY ? RATE_ECON : (type == PREMIUM ? RATE_PREM : RATE_SHARE));
-        double minFare = (type == ECONOMY ? MIN_ECON : (type == PREMIUM ? MIN_PREM : MIN_SHARE));
-        double distanceFare = distance * perKm;
-        double baseFare = distanceFare < minFare ? minFare : distanceFare;
-
-        // add booking fee
-        double subtotal = baseFare + BOOKING_FEE;
-
-        // apply surge if peak
-        if (peak)
-            subtotal *= SURGE_PEAK;
-
-        // service fee
-        double serviceFee = subtotal * SERVICE_FEE;
-        subtotal += serviceFee;
-
-        // promo
-        double discount = 0.0;
-        if (promo == PROMO)
-        {
-            discount = subtotal * PROMO_DISC;
-            subtotal -= discount;
-        }
-
-        double total = round2(subtotal);
-
-        // output summary
-        cout << "\n========== Ride Summary ==========\n";
-        cout << "Distance:           " << distance << " km\n";
-        if (type == ECONOMY)
-            cout << "Ride Type:          Economy\n";
-        else if (type == PREMIUM)
-            cout << "Ride Type:          Premium\n";
-        else
-            cout << "Ride Type:          Ride Share\n";
-        cout << "Base (after min):   RM " << baseFare << "\n";
-        cout << "Booking Fee:        RM " << BOOKING_FEE << "\n";
-        if (peak)
-            cout << "Peak Surge (x1.20): applied\n";
-        else
-            cout << "Peak Surge:         none\n";
-        cout << "Service Fee (5%):   RM " << serviceFee << "\n";
-        if (discount > 0)
-            cout << "Promo (" << PROMO << "):   -RM " << discount << "\n";
-        else
-            cout << "Promo:              none\n";
-        cout << "----------------------------------\n";
-        cout << "Total Fare:         RM " << total << "\n";
-        cout << "==================================\n";
-
-        bool ignoreBack = false;
-        keepRunning = getYesNo("\nAnother ride? (y/n): ", false, ignoreBack);
-        cout << "\n";
+        cout << "Thank you for using RidePulse! \n";
+        return 0;
     }
 
-    cout << "Thank you for using RidePulse! \n";
-    return 0;
+    catch (const runtime_error &ex)
+    {
+        cerr << "\nFatal error: " << ex.what() << "\n";
+    }
+    return 1;
 }
