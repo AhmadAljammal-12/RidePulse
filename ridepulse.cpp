@@ -2,7 +2,6 @@
 #include <string>
 #include <limits>
 #include <iomanip>
-#include <sstream>
 #include <cctype>
 #include <stdexcept>
 
@@ -43,25 +42,65 @@ bool equalsIgnoreCase(const string &lhs, const string &rhs)
     return true;
 }
 
+string trim(const string &value)
+{
+    size_t start = 0;
+    while (start < value.size() && isspace(static_cast<unsigned char>(value[start])))
+    {
+        ++start;
+    }
+    size_t end = value.size();
+    while (end > start && isspace(static_cast<unsigned char>(value[end - 1])))
+    {
+        --end;
+    }
+    return value.substr(start, end - start);
+}
+
+bool promptAndReadLine(const string &prompt, string &line, const string &context)
+{
+    cout << prompt;
+    if (!getline(cin, line))
+    {
+        if (cin.eof())
+            throwInputTerminated(context);
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        return false;
+    }
+    return true;
+}
+
 double getPositiveDouble(const string &prompt)
 {
     while (true)
     {
-        cout << prompt;
-        double v;
-        if (cin >> v)
+        string line;
+        if (!promptAndReadLine(prompt, line, "entering the trip distance"))
         {
-            if (v > 0)
-                return v;
+            cout << "❌ Invalid input. Please enter a positive number.\n";
+            continue;
         }
-        else
+        string trimmed = trim(line);
+        if (trimmed.empty())
         {
-            if (cin.eof())
-                throwInputTerminated("entering the trip distance");
+            cout << "❌ Invalid input. Please enter a positive number.\n";
+            continue;
+        }
+        try
+        {
+            size_t idx = 0;
+            double value = stod(trimmed, &idx);
+            if (idx == trimmed.size() && value > 0.0)
+                return value;
+        }
+        catch (const invalid_argument &)
+        {
+        }
+        catch (const out_of_range &)
+        {
         }
         cout << "❌ Invalid input. Please enter a positive number.\n";
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
     }
 }
 
@@ -74,31 +113,44 @@ int getRideChoice(bool allowBack, bool &goBack)
              << "1. Economy   (RM 1.50/km, min RM 4)\n"
              << "2. Premium   (RM 2.50/km, min RM 7)\n"
              << "3. Ride Share(RM 1.00/km, min RM 3)\n";
-        cout << (allowBack ? "Enter choice (1-3 or 'back'): " : "Enter choice (1-3): ");
         string input;
-        if (!(cin >> input))
+        if (!promptAndReadLine(allowBack ? "Enter choice (1-3 or 'back'): " : "Enter choice (1-3): ", input, "selecting a ride type"))
         {
-            if (cin.eof())
-                throwInputTerminated("selecting a ride type");
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
             cout << "❌ Invalid choice. Please enter 1, 2, or 3";
             if (allowBack)
                 cout << " (or type 'back' to return)";
             cout << ".\n";
             continue;
         }
-        if (allowBack && isBackCommand(input))
+        string trimmed = trim(input);
+        if (trimmed.empty())
+        {
+            cout << "❌ Invalid choice. Please enter 1, 2, or 3";
+            if (allowBack)
+                cout << " (or type 'back' to return)";
+            cout << ".\n";
+            continue;
+        }
+        if (allowBack && isBackCommand(trimmed))
         {
             goBack = true;
             return 0;
         }
-        stringstream ss(input);
-        int c;
-        char extra;
-        if ((ss >> c) && !(ss >> extra) && c >= 1 && c <= 3)
+        try
         {
-            return c;
+            size_t idx = 0;
+            int choice = stoi(trimmed, &idx);
+            if (idx == trimmed.size() && choice >= 1 && choice <= 3)
+            {
+                return choice;
+            }
+        }
+        catch (const invalid_argument &)
+        {
+        }
+        catch (const out_of_range &)
+        {
         }
         cout << "❌ Invalid choice. Please enter 1, 2, or 3";
         if (allowBack)
@@ -112,28 +164,33 @@ bool getYesNo(const string &prompt, bool allowBack, bool &goBack)
     while (true)
     {
         goBack = false;
-        cout << prompt;
+
         string s;
-        if (!(cin >> s))
+        if (!promptAndReadLine(prompt, s, "answering a yes/no question"))
         {
-            if (cin.eof())
-                throwInputTerminated("answering a yes/no question");
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cout << "❌ Please enter y/n";
             if (allowBack)
                 cout << " or 'back'";
             cout << ".\n";
             continue;
         }
-        if (allowBack && isBackCommand(s))
+        string trimmed = trim(s);
+        if (trimmed.empty())
+        {
+            cout << "❌ Please enter y/n";
+            if (allowBack)
+                cout << " or 'back'";
+            cout << ".\n";
+            continue;
+        }
+        if (allowBack && isBackCommand(trimmed))
         {
             goBack = true;
             return false;
         }
-        if (s == "y" || s == "Y")
+        if (equalsIgnoreCase(trimmed, "y") || equalsIgnoreCase(trimmed, "yes"))
             return true;
-        if (s == "n" || s == "N")
+        if (equalsIgnoreCase(trimmed, "n") || equalsIgnoreCase(trimmed, "no"))
             return false;
         cout << "❌ Please enter y/n";
         if (allowBack)
@@ -211,22 +268,25 @@ int main()
                 }
                 else if (step == 3)
                 {
-                    cout << "Enter promo code (or - to skip, 'back' to review peak choice): ";
-                    if (!(cin >> promoInput))
+                    string promoLine;
+                    if (!promptAndReadLine("Enter promo code (or - to skip, 'back' to review peak choice): ", promoLine, "entering a promo code"))
                     {
-                        if (cin.eof())
-                            throwInputTerminated("entering a promo code");
-                        cin.clear();
-                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
                         cout << "❌ Invalid input. Please try again.\n";
                         continue;
                     }
-                    if (isBackCommand(promoInput))
+                    string trimmedPromo = trim(promoLine);
+                    if (trimmedPromo.empty())
+                    {
+                        cout << "❌ Invalid input. Please try again.\n";
+                        continue;
+                    }
+                    if (isBackCommand(trimmedPromo))
                     {
                         cout << "↩️  Returning to peak hours question.\n\n";
                         step = 2;
                         continue;
                     }
+                    promoInput = trimmedPromo;
                     if (promoInput != "-" && !equalsIgnoreCase(promoInput, PROMO))
                     {
                         cout << "⚠️ Promo code not recognized. No discount will be applied.\n";
