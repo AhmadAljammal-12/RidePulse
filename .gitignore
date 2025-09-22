@@ -1,0 +1,10 @@
+# Build outputs
+ridepulse
+ridepulse.exe
+*.exe
+*.out
+*.o
+*.obj
+/build/
+/bin/
+/dist/
