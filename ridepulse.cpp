@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <cctype>
 #include <stdexcept>
+#include <cmath>
 
 using namespace std;
 
@@ -201,7 +202,7 @@ bool getYesNo(const string &prompt, bool allowBack, bool &goBack)
 
 double round2(double v)
 {
-    return ((long long)(v * 100 + 0.5)) / 100.0;
+    return std::round(v * 100.0 + std::copysign(1e-9, v)) / 100.0;
 }
 
 int main()
