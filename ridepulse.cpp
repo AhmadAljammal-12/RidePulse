@@ -7,7 +7,7 @@
 #include <cmath>
   
 using namespace std;
-
+ 
 enum RideType
 {
     ECONOMY = 1,
