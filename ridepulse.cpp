@@ -223,7 +223,7 @@ int main()
         const double BOOKING_FEE = 1.20; // flat booking/admin fee
         const double SERVICE_FEE = 0.05; // 5%
         const double SURGE_PEAK = 1.20;  // 20% increase at peak
-        const string PROMO = "PULSE10";
+        const string PROMO = "PULSE10"; 
         const double PROMO_DISC = 0.10; // 10%
 
         bool keepRunning = true;
