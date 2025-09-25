@@ -132,7 +132,7 @@ int getRideChoice(bool allowBack, bool &goBack)
                 cout << " (or type 'back' to return)";
             cout << ".\n";
             continue;
-        }
+        } 
         if (allowBack && isBackCommand(trimmed))
         {
             goBack = true;
