@@ -14,7 +14,7 @@ enum RideType
     PREMIUM = 2,
     SHARED = 3
 };
-
+ 
 bool isBackCommand(const string &input)
 {
     string lowered;
